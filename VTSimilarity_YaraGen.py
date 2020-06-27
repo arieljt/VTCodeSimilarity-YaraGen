@@ -6,13 +6,13 @@ import argparse
 from collections import Counter, defaultdict
 
 apiurl = "https://virustotal.com/api/v3/"
-apikey = "KEY"
+apikey = ""
 max_size = 1024 * 3 # bytes
 min_size = 1024
-min_block_length = 3 # 3 seems too small
+# min_block_length = 4 # default length
 min_threshold = 0.5
 
-def parse_input_file(min_threshold, file_path):
+def parse_input_file(min_threshold, file_path, min_block_length):
     if not os.path.isfile(file_path):
         print("File path {0} does not exist. Exiting...".format(file_path))
         sys.exit()
@@ -22,7 +22,7 @@ def parse_input_file(min_threshold, file_path):
             print("Running script for hash {0}: ".format(line.strip()))
             file_hash = line.strip()
             print file_hash
-            calculate_blocks(min_threshold, file_hash)
+            calculate_blocks(min_threshold, file_hash, min_block_length)
 
 def fetch_blocks_from_VT(file_hash):
     headers = {'x-apikey': apikey, 'Content-Type': 'application/json'}
@@ -34,7 +34,7 @@ def fetch_blocks_from_VT(file_hash):
         f.close()
     return(response_json)
 
-def calculate_blocks(min_threshold, file_hash):
+def calculate_blocks(min_threshold, file_hash, min_block_length):
     code_blocks_list = []
     code_blocks_dict = defaultdict(list)
     interesting_samples_counter = 0
@@ -105,11 +105,13 @@ def main():
                                     default=0.5, help='Minimum similarity threshold (default=0.5)')
     parser.add_argument('--list', metavar='hash_list.txt', type=str, dest='file_path',
                                     help='Path to a file containing list of hashes')
+    parser.add_argument('--min_block', metavar='6', type=int, dest='min_block_length',
+                                    default=4, help='Minimum desired codeblock size')
     args = parser.parse_args()
     if args.file_path:
-        parse_input_file(args.min_threshold, args.file_path)
-    elif args.hash:
-        calculate_blocks(args.min_threshold, args.file_hash)
+        parse_input_file(args.min_threshold, args.file_path, args.min_block_length)
+    elif args.file_hash:
+        calculate_blocks(args.min_threshold, args.file_hash, args.min_block_length)
 
 if __name__ == "__main__":
     main()
