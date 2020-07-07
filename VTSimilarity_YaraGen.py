@@ -7,21 +7,18 @@ from collections import Counter, defaultdict
 
 apiurl = "https://virustotal.com/api/v3/"
 apikey = ""
-max_size = 1024 * 3 # bytes
+min_threshold = 0.5 # 50% similarity score
 min_size = 1024
-# min_block_length = 4 # default length
-min_threshold = 0.5
+max_size = 1024 * 3
 
 def parse_input_file(min_threshold, file_path, min_block_length):
     if not os.path.isfile(file_path):
         print("File path {0} does not exist. Exiting...".format(file_path))
         sys.exit()
     with open(file_path) as file:
-        #print("Parsed {0} lines".format(len(line))
         for line in file:
             print("Running script for hash {0}: ".format(line.strip()))
             file_hash = line.strip()
-            print file_hash
             calculate_blocks(min_threshold, file_hash, min_block_length)
 
 def fetch_blocks_from_VT(file_hash):
@@ -37,38 +34,36 @@ def fetch_blocks_from_VT(file_hash):
 def calculate_blocks(min_threshold, file_hash, min_block_length):
     code_blocks_list = []
     code_blocks_dict = defaultdict(list)
-    interesting_samples_counter = 0
+    samples_over_threshold_counter = 0
     try: # Try to open json results file to spare retrieving it again
         f = open('VT_Similar_{0}.json'.format(file_hash), 'r')
-        datastore = json.load(f)
+        raw_data = json.load(f)
     except IOError:
-        datastore = fetch_blocks_from_VT(file_hash)
-    if datastore.get('data'):
-        for item in datastore['data']:
-            if item['context_attributes']['similarity_score'] > min_threshold:
-                if not item['attributes']['pe_info']:
-                    print "{0} is not a pe file, exiting".format(item['attributes']['md5'])
-                    sys.exit()
-                interesting_samples_counter += 1
-                get_filesize_range(item['attributes']['size'])
-                for block in item['context_attributes']['code_block']:
-                    if block['length'] > min_block_length:
-                        if block['offset'] not in code_blocks_dict[block['binary']]:
-                            code_blocks_dict[block['binary']].append(block['offset'])
-                        code_blocks_list.append(block['binary'])
+        raw_data = fetch_blocks_from_VT(file_hash)
+    if raw_data.get('data'):
+        for item in raw_data['data']:
+            if item['context_attributes']['similarity_score'] > min_threshold: #If the resulting sample is over the similarity threshold
+                if item.get('attributes',{}).get('pe_info'): #check if the resulting sample is a pe file
+                    samples_over_threshold_counter += 1
+                    get_filesize_range(item['attributes']['size'])
+                    for block in item['context_attributes']['code_block']:
+                        if block['length'] > min_block_length:
+                            if block['offset'] not in code_blocks_dict[block['binary']]:
+                                code_blocks_dict[block['binary']].append(block['offset'])
+                            code_blocks_list.append(block['binary'])
     else:
-        print "Got no results, please try another hash"
+        print "Got no results, please try another hash\n"
         return
-    if interesting_samples_counter >= 100:
-        print "Threshold too low, catching over 100 samples, please raise threshold"
+    if samples_over_threshold_counter >= 100:
+        print "Threshold too low, catching over 100 samples, please raise threshold\n"
         return
-    elif interesting_samples_counter == 0:
-        print "Threshold too high, caught 0 samples, please lower threshold"
+    elif samples_over_threshold_counter == 0:
+        print "Threshold too high, caught 0 samples, please lower threshold\n"
         return
     else:
-        print "Found {0} samples over the threshold of {1}".format(interesting_samples_counter,min_threshold)
+        print "Found {0} samples over the threshold of {1}".format(samples_over_threshold_counter,min_threshold)
     print "Samples size ranges between {0} bytes to {1} bytes".format(min_size,max_size)
-    cnt = Counter(code_blocks_list)
+    cnt = Counter(code_blocks_list) # Dict of code blocks and their repetition count
     generate_yara(cnt, code_blocks_dict,file_hash)
 
 def get_filesize_range(filesize):
@@ -105,7 +100,7 @@ def main():
                                     default=0.5, help='Minimum similarity threshold (default=0.5)')
     parser.add_argument('--list', metavar='hash_list.txt', type=str, dest='file_path',
                                     help='Path to a file containing list of hashes')
-    parser.add_argument('--min_block', metavar='6', type=int, dest='min_block_length',
+    parser.add_argument('--min_block', metavar='4', type=int, dest='min_block_length',
                                     default=4, help='Minimum desired codeblock size')
     args = parser.parse_args()
     if args.file_path:
