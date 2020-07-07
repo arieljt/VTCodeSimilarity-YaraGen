@@ -102,8 +102,8 @@ def main():
                                     help='Path to a file containing list of hashes')
     parser.add_argument('--min_block', metavar='4', type=int, dest='min_block_length',
                                     default=4, help='Minimum desired codeblock size')
-    parser.add_argument('--apikey', metavar='4', type=str, dest='apikey',
-                                    default='', help='VT API Key')
+    parser.add_argument('--apikey', metavar='Your VirusTotal API Key', type=str, dest='apikey',
+                                    help='VT API Key')
     args = parser.parse_args()
     global apikey
     apikey = args.apikey or apikey
