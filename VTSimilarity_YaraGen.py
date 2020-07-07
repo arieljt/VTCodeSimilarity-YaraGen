@@ -24,6 +24,11 @@ def parse_input_file(min_threshold, file_path, min_block_length):
 
 class Generator(object):
 
+    def __init__(self, min_threshold, file_hash, min_block_length):
+        self.min_threshold = min_threshold
+        self.file_hash = file_hash
+        self.min_block_length = min_block_length
+
     def fetch_blocks_from_VT(file_hash):
         headers = {'x-apikey': apikey, 'Content-Type': 'application/json'}
         response = requests.get(
