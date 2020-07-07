@@ -6,7 +6,7 @@ import argparse
 from collections import Counter, defaultdict
 
 apiurl = "https://virustotal.com/api/v3/"
-apikey = ""
+apikey = os.getenv("VT_API_KEY")
 min_threshold = 0.5 # 50% similarity score
 min_size = 1024
 max_size = 1024 * 3
@@ -102,7 +102,11 @@ def main():
                                     help='Path to a file containing list of hashes')
     parser.add_argument('--min_block', metavar='4', type=int, dest='min_block_length',
                                     default=4, help='Minimum desired codeblock size')
+    parser.add_argument('--apikey', metavar='4', type=str, dest='apikey',
+                                    default='', help='VT API Key')
     args = parser.parse_args()
+    global apikey
+    apikey = args.apikey or apikey
     if args.file_path:
         parse_input_file(args.min_threshold, args.file_path, args.min_block_length)
     elif args.file_hash:
