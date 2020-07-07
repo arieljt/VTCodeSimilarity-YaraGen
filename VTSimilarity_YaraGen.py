@@ -20,7 +20,8 @@ def parse_input_file(min_threshold, file_path, min_block_length):
         for line in file:
             print("Running script for hash {0}: ".format(line.strip()))
             file_hash = line.strip()
-            calculate_blocks(min_threshold, file_hash, min_block_length)
+            generator = Generator(min_threshold, file_hash, min_block_length)
+            generator.calculate_blocks()
 
 class Generator(object):
 
@@ -117,7 +118,8 @@ def main():
     if args.file_path:
         parse_input_file(args.min_threshold, args.file_path, args.min_block_length)
     elif args.file_hash:
-        calculate_blocks(args.min_threshold, args.file_hash, args.min_block_length)
+        generator = Generator(args.min_threshold, args.file_hash, args.min_block_length)
+        generator.calculate_blocks()
 
 if __name__ == "__main__":
     main()
