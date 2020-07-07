@@ -49,7 +49,7 @@ class Generator(object):
             f = open('VT_Similar_{0}.json'.format(self.file_hash), 'r')
             raw_data = json.load(f)
         except IOError:
-            raw_data = self.fetch_blocks_from_VT(self.file_hash)
+            raw_data = self.fetch_blocks_from_VT()
         if raw_data.get('data'):
             for item in raw_data['data']:
                 if item['context_attributes']['similarity_score'] > self.min_threshold: #If the resulting sample is over the similarity threshold
@@ -74,9 +74,9 @@ class Generator(object):
             print "Found {0} samples over the threshold of {1}".format(samples_over_threshold_counter,min_threshold)
         print "Samples size ranges between {0} bytes to {1} bytes".format(self.min_size, self.max_size)
         cnt = Counter(code_blocks_list) # Dict of code blocks and their repetition count
-        self.generate_yara(cnt, code_blocks_dict, self.file_hash)
+        self.generate_yara(cnt, code_blocks_dict)
 
-    def get_filesize_range(filesize):
+    def get_filesize_range(self, filesize):
         self.max_size = max(self.max_size, filesize)
         self.min_size = min(self.min_size, filesize)
 
