@@ -12,7 +12,7 @@ MIN_SIZE = 1024
 MAX_SIZE = 1024 * 3
 
 
-def parse_input_file(min_threshold, file_path, min_block_length):
+def parse_input_file(min_threshold, file_path, min_block_size):
     if not os.path.isfile(file_path):
         print("File path {0} does not exist. Exiting...".format(file_path))
         sys.exit()
@@ -20,15 +20,15 @@ def parse_input_file(min_threshold, file_path, min_block_length):
         for line in file:
             print("Running script for hash {0}: ".format(line.strip()))
             file_hash = line.strip()
-            generator = Generator(min_threshold, file_hash, min_block_length)
+            generator = Generator(min_threshold, file_hash, min_block_size)
             generator.calculate_blocks()
 
 class Generator(object):
 
-    def __init__(self, min_threshold, file_hash, min_block_length):
+    def __init__(self, min_threshold, file_hash, min_block_size):
         self.min_threshold = min_threshold
         self.file_hash = file_hash
-        self.min_block_length = min_block_length
+        self.min_block_size = min_block_size
         self.min_size = MIN_SIZE
         self.max_size = MAX_SIZE
 
@@ -58,7 +58,7 @@ class Generator(object):
                         samples_over_threshold_counter += 1
                         self.get_filesize_range(item['attributes']['size'])
                         for block in item['context_attributes']['code_block']:
-                            if block['length'] > self.min_block_length:
+                            if block['length'] >= self.min_block_size:
                                 if block['offset'] not in code_blocks_dict[block['binary']]:
                                     code_blocks_dict[block['binary']].append(block['offset'])
                                 code_blocks_list.append(block['binary'])
@@ -72,10 +72,14 @@ class Generator(object):
             print "Threshold too high, caught 0 samples, please lower threshold\n"
             return
         else:
-            print "Found {0} samples over the threshold of {1}".format(samples_over_threshold_counter,min_threshold)
+            print "Found {0} samples over the similarity threshold of {1:.1%}".format(samples_over_threshold_counter,min_threshold)
         print "Samples size ranges between {0} bytes to {1} bytes".format(self.min_size, self.max_size)
-        cnt = Counter(code_blocks_list) # Dict of code blocks and their repetition count
-        self.generate_yara(cnt, code_blocks_dict)
+        if code_blocks_dict:
+            cnt = Counter(code_blocks_list) # Dict of code blocks and their repetition count
+            self.generate_yara(cnt, code_blocks_dict)
+        else:
+            print "No code blocks found over set threshold size of {0}".format(self.min_block_size)
+
 
     def get_filesize_range(self, filesize):
         self.max_size = max(self.max_size, filesize)
@@ -108,7 +112,7 @@ def main():
                                     default=0.5, help='Minimum similarity threshold (default=0.5)')
     parser.add_argument('--list', metavar='hash_list.txt', type=str, dest='file_path',
                                     help='Path to a file containing list of hashes')
-    parser.add_argument('--min_block', metavar='4', type=int, dest='min_block_length',
+    parser.add_argument('--min_block', metavar='4', type=int, dest='min_block_size',
                                     default=4, help='Minimum desired codeblock size')
     parser.add_argument('--apikey', metavar='Your VirusTotal API Key', type=str, dest='apikey',
                                     help='VT API Key')
@@ -116,9 +120,9 @@ def main():
     global apikey
     apikey = args.apikey or apikey
     if args.file_path:
-        parse_input_file(args.min_threshold, args.file_path, args.min_block_length)
+        parse_input_file(args.min_threshold, args.file_path, args.min_block_size)
     elif args.file_hash:
-        generator = Generator(args.min_threshold, args.file_hash, args.min_block_length)
+        generator = Generator(args.min_threshold, args.file_hash, args.min_block_size)
         generator.calculate_blocks()
 
 if __name__ == "__main__":
