@@ -7,7 +7,6 @@ from collections import Counter, defaultdict
 
 apiurl = "https://virustotal.com/api/v3/"
 apikey = os.getenv("VT_API_KEY")
-min_threshold = 0.5 # 50% similarity score
 MIN_SIZE = 1024
 MAX_SIZE = 1024 * 3
 VERSION = 0.3
@@ -75,7 +74,7 @@ class Generator(object):
             print "Threshold too high, caught 0 samples, please lower threshold\n"
             return
         else:
-            print "Found {0} samples over the similarity threshold of {1:.1%}".format(self.samples_over_threshold_counter,min_threshold)
+            print "Found {0} samples over the similarity threshold of {1:.1%}".format(self.samples_over_threshold_counter,self.min_threshold)
         print "Samples size ranges between {0} bytes to {1} bytes".format(self.min_size, self.max_size)
         if code_blocks_dict:
             self.generate_yara(code_blocks_dict)
