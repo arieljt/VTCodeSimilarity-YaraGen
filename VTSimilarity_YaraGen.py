@@ -106,7 +106,7 @@ class Generator(object):
             i += 1
             rulefile.write("\t\t$block{0} = {{ {1} }} // Seen in {2} samples\n".format(i, block, code_blocks_dict[block]['counter']))
         rulefile.write("\n\tcondition: \n")
-        rulefile.write("\t\t(uint16(0) == 0x5A4D) and filesize > {0}KB and filesize < {1}KB \n".format(self.min_size/1024, self.max_size/1024))
+        rulefile.write("\t\t(uint16(0) == 0x5A4D) and filesize >= {0}KB and filesize <= {1}KB \n".format(self.min_size/1024, self.max_size/1024))
         rulefile.write("\tand {0} of them }}\n".format(min_condition))
         print "Generated yara rule for {0}\n".format(self.file_hash)
 
