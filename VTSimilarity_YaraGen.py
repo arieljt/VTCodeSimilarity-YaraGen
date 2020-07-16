@@ -56,7 +56,10 @@ class Generator(object):
                 if item['context_attributes']['similarity_score'] > self.min_threshold: # if the resulting sample is over the similarity threshold
                     if item.get('attributes',{}).get('pe_info'): # check if the resulting sample is a pe file
                         self.samples_over_threshold_counter += 1
-                        self.get_filesize_range(item['attributes']['size'])
+                        if item['attributes']['md5'] == self.file_hash:
+                            self.min_size = item['attributes']['size']
+                        else:
+                            self.get_filesize_range(item['attributes']['size'])
                         for block in item['context_attributes']['code_block']:
                             if block['length'] >= self.min_block_size:
                                 if not code_blocks_dict.has_key(block['binary']): # if codeblock doesn't exist
@@ -68,8 +71,7 @@ class Generator(object):
             print "Got no results, please try another hash\n"
             return
         if self.samples_over_threshold_counter >= 100:
-            print "Threshold too low, catching over 100 samples, please raise threshold\n"
-            return
+            print "Threshold too low, catching over 100 samples, consider raising threshold\n"
         elif self.samples_over_threshold_counter == 0:
             print "Threshold too high, caught 0 samples, please lower threshold\n"
             return
@@ -90,7 +92,7 @@ class Generator(object):
         sorted_code_blocks = sorted(code_blocks_dict, key=lambda x: (code_blocks_dict[x]['counter']), reverse = True)
         top_popular = input("Found {0} code blocks over set threshold, how many top ones should I use?: ".format(len(sorted_code_blocks)))
         top_code_blocks = sorted_code_blocks[:top_popular]
-        min_condition =  input("Out of {0} code blocks, what's the minimal condition?: ".format(len(top_code_blocks)))
+        min_condition =  code_blocks_dict[top_code_blocks[-1]]['counter'] # autoset min condition to the least popular codeblock selected so we'll detect our own sample
         rulefile = open('Similarity_rule_{0}.yara'.format(self.file_hash), 'w')
         rulefile.write("rule VTSimilarity_"+self.file_hash+" {\n")
         rulefile.write("\n\tmeta: \n")
@@ -104,7 +106,7 @@ class Generator(object):
             i += 1
             rulefile.write("\t\t$block{0} = {{ {1} }} // Seen in {2} samples\n".format(i, block, code_blocks_dict[block]['counter']))
         rulefile.write("\n\tcondition: \n")
-        rulefile.write("\t\t(uint16(0) == 0x5A4D) and filesize > {0}KB and filesize < {1}KB \n".format(self.min_size/1024, self.max_size/1024))
+        rulefile.write("\t\t(uint16(0) == 0x5A4D) and filesize >= {0}KB and filesize <= {1}KB \n".format(self.min_size/1024, self.max_size/1024))
         rulefile.write("\tand {0} of them }}\n".format(min_condition))
         print "Generated yara rule for {0}\n".format(self.file_hash)
 
@@ -115,7 +117,7 @@ def main():
                        help='MD5/SHA1/SHA256 hash to check on VTi')
     parser.add_argument('--t', metavar='0.5', type=float, dest='min_threshold',
                                     default=0.5, help='Minimum similarity threshold (default=0.5)')
-    parser.add_argument('--list', metavar='hash_list.txt', type=str, dest='file_path',
+    parser.add_argument('--hashlist', metavar='hash_list.txt', type=str, dest='file_path',
                                     help='Path to a file containing list of hashes')
     parser.add_argument('--min_block', metavar='4', type=int, dest='min_block_size',
                                     default=4, help='Minimum desired codeblock size')
