@@ -3,7 +3,6 @@ import json
 import os
 import sys
 import argparse
-from collections import Counter, defaultdict
 
 apiurl = "https://virustotal.com/api/v3/"
 apikey = os.getenv("VT_API_KEY")
@@ -13,6 +12,7 @@ VERSION = 0.3
 
 
 def parse_input_file(min_threshold, file_path, min_block_size):
+    """ Parses hashlist file """
     if not os.path.isfile(file_path):
         print("File path {0} does not exist. Exiting...".format(file_path))
         sys.exit()
@@ -27,14 +27,16 @@ class Generator(object):
 
     def __init__(self, min_threshold, file_hash, min_block_size):
         self.min_threshold = min_threshold
-        self.file_hash = file_hash
+        self.file_hash = file_hash.lower()
         self.min_block_size = min_block_size
         self.min_size = MIN_SIZE
         self.max_size = MAX_SIZE
         self.version = VERSION
         self.samples_over_threshold_counter = 0
+        self.original_sample_blocks = []
 
     def fetch_blocks_from_VT(self):
+        """ Fetches code blocks from VirusTotal for a given hash """
         headers = {'x-apikey': apikey, 'Content-Type': 'application/json'}
         response = requests.get(
             apiurl + 'intelligence/search?query=code-similar-to:' + self.file_hash, headers=headers)
@@ -45,6 +47,7 @@ class Generator(object):
         return(response_json)
 
     def calculate_blocks(self):
+        """ Calculates code blocks popularity and performs basic checks """
         code_blocks_dict = {}
         try: # try to open json results file to spare retrieving it again
             f = open('VT_Similar_{0}.json'.format(self.file_hash), 'r')
@@ -58,6 +61,9 @@ class Generator(object):
                         self.samples_over_threshold_counter += 1
                         if item['attributes']['md5'] == self.file_hash:
                             self.min_size = item['attributes']['size']
+                            original_sample_code_blocks = item['context_attributes']['code_block']
+                            self.original_sample_blocks = [x['binary'] for x in original_sample_code_blocks]
+                            print ("\nExtracted {0} code blocks from {1}".format(len(self.original_sample_blocks), self.file_hash))
                         else:
                             self.get_filesize_range(item['attributes']['size'])
                         for block in item['context_attributes']['code_block']:
@@ -72,11 +78,11 @@ class Generator(object):
             return
         if self.samples_over_threshold_counter >= 100:
             print "Threshold too low, catching over 100 samples, consider raising threshold\n"
-        elif self.samples_over_threshold_counter == 0:
-            print "Threshold too high, caught 0 samples, please lower threshold\n"
-            return
+        elif self.samples_over_threshold_counter == 1:
+            print "Threshold too high, caught 1 sample, consider lowering threshold\n"
+            self.max_size = self.min_size
         else:
-            print "Found {0} samples over the similarity threshold of {1:.1%}".format(self.samples_over_threshold_counter,self.min_threshold)
+            print "Parsed {0} samples over the similarity threshold of {1:.1%}".format(self.samples_over_threshold_counter,self.min_threshold)
         print "Samples size ranges between {0} bytes to {1} bytes".format(self.min_size, self.max_size)
         if code_blocks_dict:
             self.generate_yara(code_blocks_dict)
@@ -84,15 +90,26 @@ class Generator(object):
             print "No code blocks found over set threshold size of {0}".format(self.min_block_size)
 
     def get_filesize_range(self, filesize):
+        """ Stores maximal and minimal file sizes seen across samples """
         self.max_size = max(self.max_size, filesize)
         self.min_size = min(self.min_size, filesize)
 
+    def count_blocks(self, code_blocks):
+        """ Counts number of code blocks present in the original sample """
+        counter = 0
+        for block in code_blocks:
+            if block in self.original_sample_blocks:
+                counter += 1
+        return counter
+
+
     def generate_yara(self, code_blocks_dict):
+        """ Generates Yara rule """
         i = 0
         sorted_code_blocks = sorted(code_blocks_dict, key=lambda x: (code_blocks_dict[x]['counter']), reverse = True)
-        top_popular = input("Found {0} code blocks over set threshold, how many top ones should I use?: ".format(len(sorted_code_blocks)))
+        top_popular = input("\nFound {0} code blocks over set threshold, how many top ones to include?: ".format(len(sorted_code_blocks)))
         top_code_blocks = sorted_code_blocks[:top_popular]
-        min_condition =  code_blocks_dict[top_code_blocks[-1]]['counter'] # autoset min condition to the least popular codeblock selected so we'll detect our own sample
+        min_condition =  self.count_blocks(top_code_blocks)
         rulefile = open('Similarity_rule_{0}.yara'.format(self.file_hash), 'w')
         rulefile.write("rule VTSimilarity_"+self.file_hash+" {\n")
         rulefile.write("\n\tmeta: \n")
@@ -106,8 +123,8 @@ class Generator(object):
             i += 1
             rulefile.write("\t\t$block{0} = {{ {1} }} // Seen in {2} samples\n".format(i, block, code_blocks_dict[block]['counter']))
         rulefile.write("\n\tcondition: \n")
-        rulefile.write("\t\t(uint16(0) == 0x5A4D) and filesize >= {0}KB and filesize <= {1}KB \n".format(self.min_size/1024, self.max_size/1024))
-        rulefile.write("\tand {0} of them }}\n".format(min_condition))
+        rulefile.write("\t\t(uint16(0) == 0x5A4D) and filesize >= {0}KB and filesize <= {1}KB \n".format(self.min_size/1024, self.max_size/1024+1))
+        rulefile.write("\tand {0} of them }}\n\n".format(min_condition/2))
         print "Generated yara rule for {0}\n".format(self.file_hash)
 
 
