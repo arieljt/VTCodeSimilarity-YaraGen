@@ -9,7 +9,7 @@ apikey = os.getenv("VT_API_KEY")
 VERSION = 0.3
 
 
-def parse_input_file(min_similarity, file_path, min_block_size):
+def parse_input_file(min_similarity, file_path, min_block_size, debug):
     """ Parses hashlist file """
     if not os.path.isfile(file_path):
         print("File path {0} does not exist. Exiting...".format(file_path))
@@ -18,13 +18,13 @@ def parse_input_file(min_similarity, file_path, min_block_size):
         for line in file:
             print("Running script for hash {0}: ".format(line.strip()))
             file_hash = line.strip()
-            generator = Generator(min_similarity, file_hash, min_block_size)
+            generator = Generator(min_similarity, file_hash, min_block_size, debug)
             generator.calculate_blocks()
 
 
 class Generator(object):
 
-    def __init__(self, min_similarity, file_hash, min_block_size):
+    def __init__(self, min_similarity, file_hash, min_block_size, debug):
         self.min_similarity = float(min_similarity.strip('%')) / 100.0
         self.file_hash = file_hash.lower()
         self.min_block_size = min_block_size
@@ -33,6 +33,7 @@ class Generator(object):
         self.version = VERSION
         self.samples_over_threshold_counter = 0
         self.original_sample_blocks = []
+        self.debug = debug
 
     def fetch_blocks_from_VT(self):
         """ Fetches code blocks from VirusTotal for a given hash """
@@ -40,10 +41,11 @@ class Generator(object):
         response = requests.get(
             apiurl + 'intelligence/search?query=code-similar-to:' + self.file_hash, headers=headers)
         response_json = response.json()
-        # save json file for debugging purposes
-        with open('VT_Similar_{0}.json'.format(self.file_hash), 'w') as f:
-            json.dump(response_json, f)
-            f.close()
+        if self.debug == True:
+            # save json file for debugging purposes
+            with open('VT_Similar_{0}.json'.format(self.file_hash), 'w') as f:
+                json.dump(response_json, f)
+                f.close()
         return(response_json)
 
     def calculate_blocks(self):
@@ -154,6 +156,7 @@ def main():
     parser.add_argument('--min_block', metavar='4', type=int, dest='min_block_size',
                         default=4, help='Minimum desired codeblock size')
     parser.add_argument('--apikey', type=str, dest='apikey', help='VT API Key')
+    parser.add_argument('--debug', action='store_true', help='Store VirusTotal JSON response')
     args = parser.parse_args()
 
     global apikey
@@ -163,9 +166,9 @@ def main():
         parser.print_help(sys.stderr)
         sys.exit(1)
     elif args.file_path:
-        parse_input_file(args.min_similarity, args.file_path, args.min_block_size)
+        parse_input_file(args.min_similarity, args.file_path, args.min_block_size, args.debug)
     elif args.file_hash:
-        generator = Generator(args.min_similarity, args.file_hash, args.min_block_size)
+        generator = Generator(args.min_similarity, args.file_hash, args.min_block_size, args.debug)
         generator.calculate_blocks()
 
 
