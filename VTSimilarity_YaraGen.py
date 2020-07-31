@@ -25,7 +25,7 @@ def parse_input_file(min_similarity, file_path, min_block_size):
 class Generator(object):
 
     def __init__(self, min_similarity, file_hash, min_block_size):
-        self.min_similarity = min_similarity
+        self.min_similarity = float(min_similarity.strip('%')) / 100.0
         self.file_hash = file_hash.lower()
         self.min_block_size = min_block_size
         self.min_size = None
@@ -147,8 +147,8 @@ def main():
     parser = argparse.ArgumentParser(description='VTSimilarity Yara Generator')
     parser.add_argument('--hash', metavar='Hash', type=str, dest='file_hash',
                         help='MD5/SHA1/SHA256 hash to check on VTi')
-    parser.add_argument('--t', metavar='0.5', type=float, dest='min_similarity',
-                        default=0.5, help='Minimum similarity threshold (default=0.5)')
+    parser.add_argument('--threshold', metavar='50%', type=str, dest='min_similarity',
+                        default="50%", help='Minimum similarity threshold')
     parser.add_argument('--hashlist', metavar='hash_list.txt', type=str, dest='file_path',
                         help='Path to a file containing list of hashes')
     parser.add_argument('--min_block', metavar='4', type=int, dest='min_block_size',
