@@ -1,4 +1,4 @@
-#!/usr/bin/python
+#!/usr/bin/env python3
 # VTCodeSimilarity Yara generator
 # Ariel Jungheit, @arieljt
 import requests
@@ -11,18 +11,22 @@ __version__ = "0.4"
 apiurl = "https://virustotal.com/api/v3/"
 apikey = os.getenv("VT_API_KEY")
 
+
 def print_banner():
-    print("------------------------------------------------------------------------------")
-    print("........ O ........  _   __ ______  _____          __                         ")
-    print("...... O---o ...... | | / //_  __/ / ___/ ___  ___/ / ___                     ")
-    print("..... O-----o ..... | |/ /  / /   / /__  / _ \/ _  / / -_)                    ")
-    print(".... o-------o .... |___/  /_/    \___/  \___/\_,_/  \__/                     ")
-    print("..... o-----O .....    ____   _           _    __               _   __        ")
-    print("...... o---O ......   / __/  (_)  __ _   (_)  / / ___ _  ____  (_) / /_  __ __")
-    print("........ O ........  _\ \   / /  /  ' \ / /  / / / _ `/ / __/ / / / __/ / // /")
-    print("...... O---o ...... /___/  /_/  /_/_/_//_/  /_/  \_,_/ /_/   /_/  \__/  \_, / ")
-    print("..... O-----o .....                                     Version: {0}   /___/  ").format(__version__ )
-    print("------------------------------------------------------------------------------")
+    print("""\
+------------------------------------------------------------------------------
+........ O ........  _   __ ______  _____          __                         
+...... O---o ...... | | / //_  __/ / ___/ ___  ___/ / ___                     
+..... O-----o ..... | |/ /  / /   / /__  / _ \/ _  / / -_)                    
+.... o-------o .... |___/  /_/    \___/  \___/\_,_/  \__/                     
+..... o-----O .....    ____   _           _    __               _   __        
+...... o---O ......   / __/  (_)  __ _   (_)  / / ___ _  ____  (_) / /_  __ __
+........ O ........  _\ \   / /  /  ' \ / /  / / / _ `/ / __/ / / / __/ / // /
+...... O---o ...... /___/  /_/  /_/_/_//_/  /_/  \_,_/ /_/   /_/  \__/  \_, / 
+..... O-----o .....                                     Version: {}   /___/  
+------------------------------------------------------------------------------
+""".format(__version__))
+
 
 def parse_input_file(min_similarity, file_path, min_block_size, debug):
     # Parses hash list file
@@ -33,7 +37,8 @@ def parse_input_file(min_similarity, file_path, min_block_size, debug):
         for line in file:
             print("[+] Running script for hash {0}: ".format(line.strip()))
             file_hash = line.strip()
-            generator = Generator(min_similarity, file_hash, min_block_size, debug)
+            generator = Generator(
+                min_similarity, file_hash, min_block_size, debug)
             generator.calculate_blocks()
 
 
@@ -74,49 +79,66 @@ class Generator(object):
         if raw_data.get('data'):
             for item in raw_data['data']:
                 # If the resulting sample is over the similarity threshold
-                if item['context_attributes']['similarity_score'] > self.min_similarity: # Check if resulting sample is over set similarity threshold
-                    if item.get('attributes', {}).get('pe_info'):  # Check if the resulting sample is a pe file
+                # Check if resulting sample is over set similarity threshold
+                if item['context_attributes']['similarity_score'] > self.min_similarity:
+                    # Check if the resulting sample is a pe file
+                    if item.get('attributes', {}).get('pe_info'):
                         self.samples_over_threshold_counter += 1
-                        if item['attributes']['md5'] == self.file_hash: # If we're looking at our original sample
-                            self.min_size = item['attributes']['size'] # Set initial filesize
-                            original_sample_code_blocks = item['context_attributes']['code_block'] # Collect original sample codeblocks
+                        # If we're looking at our original sample
+                        if item['attributes']['md5'] == self.file_hash:
+                            # Set initial filesize
+                            self.min_size = item['attributes']['size']
+                            # Collect original sample codeblocks
+                            original_sample_code_blocks = item['context_attributes']['code_block']
                             self.original_sample_blocks = [x['binary']
                                                            for x in original_sample_code_blocks]
-                            print ("[+] Extracted {0} code blocks from {1}".format(
+                            print("[+] Extracted {0} code blocks from {1}".format(
                                 len(self.original_sample_blocks), self.file_hash))
                         else:
-                            self.get_filesize_range(item['attributes']['size']) # Update filesize range
-                        for block in item['context_attributes']['code_block']: # Collect codeblocks
-                            if block['length'] >= self.min_block_size: # Check that block size is over set length
-                                if not code_blocks_dict.has_key(block['binary']): # If codeblock doesn't exist
+                            # Update filesize range
+                            self.get_filesize_range(item['attributes']['size'])
+                        # Collect codeblocks
+                        for block in item['context_attributes']['code_block']:
+                            # Check that block size is over set length
+                            if block['length'] >= self.min_block_size:
+                                # If codeblock doesn't exist
+                                if not block['binary'] in code_blocks_dict:
                                     code_blocks_dict.update({block['binary']: {'counter': 0, 'asm': [block['asm']], 'offset': [
                                                             block['offset']]}})  # Add new codeblock, its assembly and offset
-                                code_blocks_dict[block['binary']]['counter'] += 1 # Up the count seen for each codeblock
-                                if block['offset'] not in code_blocks_dict[block['binary']]['offset']: # If offset seen for the codeblock is new
+                                # Up the count seen for each codeblock
+                                code_blocks_dict[block['binary']
+                                                 ]['counter'] += 1
+                                # If offset seen for the codeblock is new
+                                if block['offset'] not in code_blocks_dict[block['binary']]['offset']:
                                     code_blocks_dict[block['binary']
                                                      ]['offset'].append(block['offset'])
         else:
-            print "[-] Got no results, please try another hash\n"
+            print("[-] Got no results, please try another hash\n")
             return
         if self.samples_over_threshold_counter >= 100:
-            print "[-] Similarity threshold too low, catching over 100 samples, consider raising threshold\n"
+            print(
+                "[-] Similarity threshold too low, catching over 100 samples, consider raising threshold\n")
         elif self.samples_over_threshold_counter == 1:
-            print "[-] Similarity threshold too high, caught 1 sample, consider lowering threshold\n"
+            print(
+                "[-] Similarity threshold too high, caught 1 sample, consider lowering threshold\n")
             self.max_size = self.min_size
         else:
-            print "[+] Parsed {0} samples over the similarity threshold of {1:.1%}".format(
-                self.samples_over_threshold_counter, self.min_similarity)
-        print "[+] Samples size ranges between {0} bytes to {1} bytes".format(
-            self.min_size, self.max_size)
+            print("[+] Parsed {0} samples over the similarity threshold of {1:.1%}".format(
+                self.samples_over_threshold_counter, self.min_similarity))
+        print("[+] Samples size ranges between {0} bytes to {1} bytes".format(
+            self.min_size, self.max_size))
         if code_blocks_dict:
             self.generate_yara(code_blocks_dict)
         else:
-            print "[-] Found no code blocks over set threshold size of {0}".format(self.min_block_size)
+            print(
+                "[-] Found no code blocks over set threshold size of {0}".format(self.min_block_size))
 
     def get_filesize_range(self, filesize):
         # Stores maximal and minimal file sizes seen across samples
-        self.max_size = max(self.max_size, filesize)
-        self.min_size = min(self.min_size, filesize)
+        self.max_size = filesize if (
+            self.max_size == None or filesize > self.max_size) else self.max_size
+        self.min_size = filesize if (
+            self.min_size == None or filesize < self.min_size) else self.min_size
 
     def count_blocks(self, code_blocks):
         # Counts number of code blocks present in the original sample
@@ -131,8 +153,8 @@ class Generator(object):
         i = 0
         sorted_code_blocks = sorted(code_blocks_dict, key=lambda x: (
             code_blocks_dict[x]['counter']), reverse=True)
-        top_popular = input("\n[+] Found {0} code blocks over set threshold, how many top ones to include?: ".format(
-            len(sorted_code_blocks)))
+        top_popular = int(input("\n[+] Found {0} code blocks over set threshold, how many top ones to include?: ".format(
+            len(sorted_code_blocks))))
         top_code_blocks = sorted_code_blocks[:top_popular]
         min_condition = self.count_blocks(top_code_blocks)
         rulefile = open('Similarity_rule_{0}.yara'.format(self.file_hash), 'w')
@@ -141,8 +163,10 @@ class Generator(object):
         rulefile.write(
             "\t\tdescription = \"rule to hunt for samples similar to {0}\"\n".format(self.file_hash))
         rulefile.write("\t\tscript_version = \"{0}\"\n".format(self.version))
-        rulefile.write("\t\tsimilarity_threshold = \"{0:.0%}\"\n".format(self.min_similarity))
-        rulefile.write("\t\tminimal_codeblock_size = \"{0}\"\n".format(self.min_block_size))
+        rulefile.write(
+            "\t\tsimilarity_threshold = \"{0:.0%}\"\n".format(self.min_similarity))
+        rulefile.write(
+            "\t\tminimal_codeblock_size = \"{0}\"\n".format(self.min_block_size))
         rulefile.write("\t\tsimilar_samples_analyzed = \"{0}\"\n".format(
             self.samples_over_threshold_counter))
         rulefile.write("\n\tstrings: \n")
@@ -154,11 +178,12 @@ class Generator(object):
         rulefile.write("\t\t(uint16(0) == 0x5A4D) and filesize >= {0}KB and filesize <= {1}KB \n".format(
             self.min_size/1024, self.max_size/1024+1))
         rulefile.write("\tand {0} of them }}\n".format(min_condition))
-        print "[+] Generated yara rule for {0}\n".format(self.file_hash)
+        print("[+] Generated yara rule for {0}\n".format(self.file_hash))
 
 
 def main():
-    parser = argparse.ArgumentParser(description='VirusTotal Code Similarity Yara Generator')
+    parser = argparse.ArgumentParser(
+        description='VirusTotal Code Similarity Yara Generator')
     parser.add_argument('--hash', metavar='MD5/SHA1/SHA256', type=str, dest='file_hash',
                         help='MD5/SHA1/SHA256 hash to check on VTi')
     parser.add_argument('--threshold', metavar='50%', type=str, dest='min_similarity',
@@ -168,7 +193,8 @@ def main():
     parser.add_argument('--min_block', metavar='4', type=int, dest='min_block_size',
                         default=4, help='Minimum desired codeblock size')
     parser.add_argument('--apikey', type=str, dest='apikey', help='VT API key')
-    parser.add_argument('--debug', action='store_true', help='Store VirusTotal JSON data')
+    parser.add_argument('--debug', action='store_true',
+                        help='Store VirusTotal JSON data')
     args = parser.parse_args()
 
     global apikey
@@ -180,9 +206,11 @@ def main():
     elif not apikey:
         parser.error("API key missing")
     elif args.file_path:
-        parse_input_file(args.min_similarity, args.file_path, args.min_block_size, args.debug)
+        parse_input_file(args.min_similarity, args.file_path,
+                         args.min_block_size, args.debug)
     elif args.file_hash:
-        generator = Generator(args.min_similarity, args.file_hash, args.min_block_size, args.debug)
+        generator = Generator(args.min_similarity,
+                              args.file_hash, args.min_block_size, args.debug)
         generator.calculate_blocks()
 
 
