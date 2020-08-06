@@ -1,6 +1,7 @@
 #!/usr/bin/python
 # VTCodeSimilarity Yara generator
 # Ariel Jungheit, @arieljt
+# Modified to support Python 3 by Thomas Roccia @fr0gger_
 import requests
 import json
 import os
@@ -10,6 +11,7 @@ import argparse
 __version__ = "0.4"
 apiurl = "https://virustotal.com/api/v3/"
 apikey = os.getenv("VT_API_KEY")
+
 
 def print_banner():
     print("------------------------------------------------------------------------------")
@@ -21,8 +23,9 @@ def print_banner():
     print("...... o---O ......   / __/  (_)  __ _   (_)  / / ___ _  ____  (_) / /_  __ __")
     print("........ O ........  _\ \   / /  /  ' \ / /  / / / _ `/ / __/ / / / __/ / // /")
     print("...... O---o ...... /___/  /_/  /_/_/_//_/  /_/  \_,_/ /_/   /_/  \__/  \_, / ")
-    print("..... O-----o .....                                     Version: {0}   /___/  ").format(__version__ )
+    print("..... O-----o .....                                     Version: {0}   /___/  ").format(__version__)
     print("------------------------------------------------------------------------------")
+
 
 def parse_input_file(min_similarity, file_path, min_block_size, debug):
     # Parses hash list file
@@ -61,7 +64,7 @@ class Generator(object):
             with open('VT_Similar_{0}.json'.format(self.file_hash), 'w') as f:
                 json.dump(response_json, f)
                 f.close()
-        return(response_json)
+        return (response_json)
 
     def calculate_blocks(self):
         # Calculates code blocks popularity and performs basic checks
@@ -74,47 +77,56 @@ class Generator(object):
         if raw_data.get('data'):
             for item in raw_data['data']:
                 # If the resulting sample is over the similarity threshold
-                if item['context_attributes']['similarity_score'] > self.min_similarity: # Check if resulting sample is over set similarity threshold
+                if item['context_attributes'][
+                    'similarity_score'] > self.min_similarity:  # Check if resulting sample is over set similarity threshold
                     if item.get('attributes', {}).get('pe_info'):  # Check if the resulting sample is a pe file
                         self.samples_over_threshold_counter += 1
-                        if item['attributes']['md5'] == self.file_hash: # If we're looking at our original sample
-                            self.min_size = item['attributes']['size'] # Set initial filesize
-                            original_sample_code_blocks = item['context_attributes']['code_block'] # Collect original sample codeblocks
+                        if item['attributes']['md5'] == self.file_hash:  # If we're looking at our original sample
+                            self.min_size = item['attributes']['size']  # Set initial filesize
+                            original_sample_code_blocks = item['context_attributes'][
+                                'code_block']  # Collect original sample codeblocks
                             self.original_sample_blocks = [x['binary']
                                                            for x in original_sample_code_blocks]
-                            print ("[+] Extracted {0} code blocks from {1}".format(
+                            print("[+] Extracted {0} code blocks from {1}".format(
                                 len(self.original_sample_blocks), self.file_hash))
                         else:
-                            self.get_filesize_range(item['attributes']['size']) # Update filesize range
-                        for block in item['context_attributes']['code_block']: # Collect codeblocks
-                            if block['length'] >= self.min_block_size: # Check that block size is over set length
-                                if not code_blocks_dict.has_key(block['binary']): # If codeblock doesn't exist
-                                    code_blocks_dict.update({block['binary']: {'counter': 0, 'asm': [block['asm']], 'offset': [
-                                                            block['offset']]}})  # Add new codeblock, its assembly and offset
-                                code_blocks_dict[block['binary']]['counter'] += 1 # Up the count seen for each codeblock
-                                if block['offset'] not in code_blocks_dict[block['binary']]['offset']: # If offset seen for the codeblock is new
+                            self.get_filesize_range(item['attributes']['size'])  # Update filesize range
+                        for block in item['context_attributes']['code_block']:  # Collect codeblocks
+                            if block['length'] >= self.min_block_size:  # Check that block size is over set length
+                                if block['binary'] not in code_blocks_dict:  # If codeblock doesn't exist
+                                    code_blocks_dict.update(
+                                        {block['binary']: {'counter': 0, 'asm': [block['asm']], 'offset': [
+                                            block['offset']]}})  # Add new codeblock, its assembly and offset
+                                code_blocks_dict[block['binary']][
+                                    'counter'] += 1  # Up the count seen for each codeblock
+                                if block['offset'] not in code_blocks_dict[block['binary']][
+                                    'offset']:  # If offset seen for the codeblock is new
                                     code_blocks_dict[block['binary']
-                                                     ]['offset'].append(block['offset'])
+                                    ]['offset'].append(block['offset'])
         else:
-            print "[-] Got no results, please try another hash\n"
+            print("[-] Got no results, please try another hash\n")
             return
         if self.samples_over_threshold_counter >= 100:
-            print "[-] Similarity threshold too low, catching over 100 samples, consider raising threshold\n"
+            print("[-] Similarity threshold too low, catching over 100 samples, consider raising threshold\n")
         elif self.samples_over_threshold_counter == 1:
-            print "[-] Similarity threshold too high, caught 1 sample, consider lowering threshold\n"
+            print("[-] Similarity threshold too high, caught 1 sample, consider lowering threshold\n")
             self.max_size = self.min_size
         else:
-            print "[+] Parsed {0} samples over the similarity threshold of {1:.1%}".format(
-                self.samples_over_threshold_counter, self.min_similarity)
-        print "[+] Samples size ranges between {0} bytes to {1} bytes".format(
-            self.min_size, self.max_size)
+            print("[+] Parsed {0} samples over the similarity threshold of {1:.1%}".format(
+                self.samples_over_threshold_counter, self.min_similarity))
+        print("[+] Samples size ranges between {0} bytes to {1} bytes".format(
+            self.min_size, self.max_size))
         if code_blocks_dict:
             self.generate_yara(code_blocks_dict)
         else:
-            print "[-] Found no code blocks over set threshold size of {0}".format(self.min_block_size)
+            print("[-] Found no code blocks over set threshold size of {0}".format(self.min_block_size))
 
     def get_filesize_range(self, filesize):
         # Stores maximal and minimal file sizes seen across samples
+        if self.max_size is None:
+            self.max_size = 0
+        if self.min_size is None:
+            self.min_size = 0
         self.max_size = max(self.max_size, filesize)
         self.min_size = min(self.min_size, filesize)
 
@@ -133,10 +145,11 @@ class Generator(object):
             code_blocks_dict[x]['counter']), reverse=True)
         top_popular = input("\n[+] Found {0} code blocks over set threshold, how many top ones to include?: ".format(
             len(sorted_code_blocks)))
-        top_code_blocks = sorted_code_blocks[:top_popular]
+        top_code_blocks = sorted_code_blocks[:int(top_popular)]
         min_condition = self.count_blocks(top_code_blocks)
+
         rulefile = open('Similarity_rule_{0}.yara'.format(self.file_hash), 'w')
-        rulefile.write("rule VTCodeSimilarity_"+self.file_hash+" {\n")
+        rulefile.write("rule VTCodeSimilarity_" + self.file_hash + " {\n")
         rulefile.write("\n\tmeta: \n")
         rulefile.write(
             "\t\tdescription = \"rule to hunt for samples similar to {0}\"\n".format(self.file_hash))
@@ -149,12 +162,13 @@ class Generator(object):
         for block in top_code_blocks:
             i += 1
             rulefile.write(
-                "\t\t$block{0} = {{ {1} }} // Seen in {2} samples\n".format(i, block, code_blocks_dict[block]['counter']))
+                "\t\t$block{0} = {{ {1} }} // Seen in {2} samples\n".format(i, block,
+                                                                            code_blocks_dict[block]['counter']))
         rulefile.write("\n\tcondition: \n")
         rulefile.write("\t\t(uint16(0) == 0x5A4D) and filesize >= {0}KB and filesize <= {1}KB \n".format(
-            self.min_size/1024, self.max_size/1024+1))
+            self.min_size / 1024, self.max_size / 1024 + 1))
         rulefile.write("\tand {0} of them }}\n".format(min_condition))
-        print "[+] Generated yara rule for {0}\n".format(self.file_hash)
+        print("[+] Generated yara rule for {0}\n".format(self.file_hash))
 
 
 def main():
