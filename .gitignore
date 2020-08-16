@@ -2,3 +2,7 @@
 .DS_Store
 .AppleDouble
 .LSOverride
+
+# Generated rules and debug json
+*.yar[a]?
+*.json
