@@ -9,7 +9,7 @@ This Yara generator was presented on GReAT Ideas July 2020 showing how you could
 
 ## Prerequisites
 - VirusTotal Enterprise API key
-- Python 2.7.X, requests, json
+- Python 2/3, requests, json
 
 ### How does it work?
 ![Execution Flow](/media/workflow.gif?raw=true)
