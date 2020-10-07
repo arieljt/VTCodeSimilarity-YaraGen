@@ -71,18 +71,18 @@ This VirusTotal feature is still in beta phase.
 
 The code blocks are stored in a nested dictionary:
 ```
-{ binary : { counter : 1, asm : 'mov r8, rsi\nmov edx, ebx' , offset : 536990455,43655401} }
+{ binary : { counter : 1, offset : 536990455,43655401} }
 ```
 Where:
 - `binary` is the actual code block
 - `counter` contains the number of times this code block was seen across results
-- `asm` contains the assembly representation of that code block
+- ~~`asm` contains the assembly representation of that code block~~ Removed, since it might be removed from the API in the future
 - `offset` contains all the offsets that this code block was seen at
 
 ### TODO
 
 Please feel free to contribute and submit pull requests. Some ideas so far:
-- Print the assembly code, most likely printing it interactively.
+- ~~Print the assembly code, most likely printing it interactively.~~ Removed, since it might be removed from the API in the future
 - Make use of the offsets of the code blocks in the Yara condition.
 - Give more information when pruning less popular code blocks.
 
