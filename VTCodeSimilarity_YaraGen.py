@@ -103,8 +103,12 @@ class Generator(object):
                             if block['length'] >= self.min_block_size:
                                 # If codeblock doesn't exist
                                 if not block['binary'] in code_blocks_dict:
-                                    code_blocks_dict.update({block['binary']: {'counter': 0, 'asm': [block['asm']], 'offset': [
-                                                            block['offset']]}})  # Add new codeblock, its assembly and offset
+                                    code_blocks_dict.update({
+                                        block['binary']: {
+                                            'counter': 0,
+                                            'offset': [block['offset']]
+                                        }
+                                    })  # Add new codeblock and offset
                                 # Up the count seen for each codeblock
                                 code_blocks_dict[block['binary']
                                                  ]['counter'] += 1
